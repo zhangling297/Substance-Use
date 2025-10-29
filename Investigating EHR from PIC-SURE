@@ -1,0 +1,88 @@
+About the data
+This example code uses a synthetically generated dataset from Synthea, an open-source patient population simulation. The dataset has been formatted to mirror what a data export from PIC-SURE may look like.
+It includes all age groups and is not limited to pediatric patients.
+
+Jason Walonoski, Mark Kramer, Joseph Nichols, Andre Quina, Chris Moesel, Dylan Hall, Carlton Duffett, Kudakwashe Dube, Thomas Gallagher, Scott McLachlan, Synthea: An approach, method, and software mechanism for generating synthetic patients and the synthetic electronic health care record, Journal of the American Medical Informatics Association, Volume 25, Issue 3, March 2018, Pages 230–238, https://doi.org/10.1093/jamia/ocx079
+
+Installing packages
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from datetime import datetime
+import requests
+import zipfile
+import io
+pd.set_option('display.max_colwidth', None)
+Loading the data
+The following code downloads the dataset.
+
+Loading the data
+The following code downloads the dataset.
+# The data is stored on github:
+url = "https://github.com/hms-dbmi/pic-sure-public-datasets/raw/main/synthea_10k_picsure_format.csv.zip"
+
+# Download the ZIP file from GitHub
+response = requests.get(url)
+response.raise_for_status()  # Ensure the request was successful
+
+# Open the ZIP file
+with zipfile.ZipFile(io.BytesIO(response.content)) as z:
+    # List files in the ZIP
+    print("Files in ZIP:", z.namelist())
+    
+    # Extract and load the CSV file (assuming the first file is the desired CSV)
+    with z.open(z.namelist()[0]) as f:
+        data = pd.read_csv(f)
+Taking a first look at the dataset
+Let's use the head() function to take a first look at the dataset. You'll see 5 columns:
+
+PATIENT_NUM: Represents a unique patient identifier
+CONCEPT_PATH: Represents the clinical variable for a given observation (row)
+TVAL_CHAR: The text / character value of the clinical variable, if applicable
+NVAL_NUM: The numerical value of the clinical variable, if applicable
+TIMESTAMP: The date and time associated to a given observation (row)
+
+# The timestamp is in unix format. Convert to datetime
+data['TIMESTAMP'] = pd.to_datetime(data['TIMESTAMP'], unit='s')
+
+The EHR data represented in this dataset may be very large, making it difficult to explore manually.
+
+You'll notice that the CONCEPT_PATH column consists of a hierarchy that narrows down to a certain clinical variable.
+
+Let's take a look at the highest level of the CONCEPT_PATH to see what kind of data we have. We can consider this to be the VARIABLE_TYPE.
+
+# Isolate the variable type using regular expressions, and create a new column for variable type
+data['VARIABLE_TYPE'] = data['CONCEPT_PATH'].str.extract(r'\\([^\\]+)\\')
+# Count how many observations are associated with each variable type
+data['VARIABLE_TYPE'].value_counts()
+
+As seen above, this dataset contains the following data types:
+
+ACT Lab Test Results (Labs)
+ACT Medications
+ACT Diagnosis ICD-10 (Diagnoses)
+ACT Procedures CPT (Procedures)
+ACT Demographics
+
+data.tail()#
+
+data['PATIENT_NUM'].nunique()
+# Changing the time stamp to a date format
+data['TIMESTAMP'] = pd.to_datetime(data['TIMESTAMP'], errors='coerce')
+data['DATE'] = data['TIMESTAMP'].dt.date
+
+
+# Create a histogram of dates
+plt.figure(figsize=(12, 6))
+data['DATE'].hist(bins=30, color='skyblue', edgecolor='black')
+plt.xlabel('Date')
+plt.ylabel('Frequency')
+plt.title('Histogram of Dates')
+plt.xticks(rotation=45)
+plt.tight_layout()
+plt.show()
+The majority of our dataset is from the last 15 years, as expected.
+
+We also see data stretching far back to 1920; perhaps this is associated with a patient's age. Depending on your research question, you may want to investigate those outliers.
